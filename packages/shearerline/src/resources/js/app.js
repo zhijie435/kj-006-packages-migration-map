@@ -1,17 +1,14 @@
-import CourseCard from './components/CourseCard.vue';
-import StatisticsPanel from './components/StatisticsPanel.vue';
+import { createApp } from 'vue';
 import DataTable from './components/DataTable.vue';
+import StatisticsPanel from './components/StatisticsPanel.vue';
+import CourseCard from './components/CourseCard.vue';
 
-export {
-    CourseCard,
-    StatisticsPanel,
-    DataTable
-};
+const app = createApp({});
 
-export default {
-    install(app) {
-        app.component('CourseCard', CourseCard);
-        app.component('StatisticsPanel', StatisticsPanel);
-        app.component('DataTable', DataTable);
-    }
-};
+app.component('DataTable', DataTable);
+app.component('StatisticsPanel', StatisticsPanel);
+app.component('CourseCard', CourseCard);
+
+app.mount('#app');
+
+export default app;

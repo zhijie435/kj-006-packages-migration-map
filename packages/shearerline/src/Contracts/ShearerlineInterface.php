@@ -49,4 +49,6 @@ interface ShearerlineInterface
     public function enrollStudent(array $data);
 
     public function cancelEnrollment(int $id);
+
+    public function getCourseStatistics(int $courseId): array;
 }

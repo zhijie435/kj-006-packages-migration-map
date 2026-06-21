@@ -2,8 +2,12 @@
 
 namespace Shearerline;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Shearerline\Contracts\ShearerlineInterface;
+use Shearerline\Events\CourseCompleted;
+use Shearerline\Events\StudentEnrolled;
+use Shearerline\Listeners\SendEnrollmentNotification;
 
 class ShearerlineServiceProvider extends ServiceProvider
 {
@@ -25,6 +29,8 @@ class ShearerlineServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerEvents();
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/config/shearerline.php' => config_path('shearerline.php'),
@@ -54,6 +60,19 @@ class ShearerlineServiceProvider extends ServiceProvider
         $this->registerRoutes();
         $this->registerViews();
         $this->registerMigrations();
+    }
+
+    protected function registerEvents(): void
+    {
+        Event::listen(
+            StudentEnrolled::class,
+            [SendEnrollmentNotification::class, 'handle']
+        );
+
+        Event::listen(
+            CourseCompleted::class,
+            [SendEnrollmentNotification::class, 'handle']
+        );
     }
 
     protected function registerRoutes(): void

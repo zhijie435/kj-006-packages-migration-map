@@ -45,8 +45,8 @@ class DashboardController extends Controller
             'enrollments_count' => Enrollment::count(),
             'completed_enrollments_count' => Enrollment::where('status', 'completed')->count(),
             'total_revenue' => Enrollment::where('status', '!=', 'refunded')
-                ->join('shearerline_courses', 'shearerline_enrollments.course_id', '=', 'shearerline_courses.id')
-                ->sum('shearerline_courses.price'),
+                ->join(config('shearerline.tables.courses', 'shearerline_courses'), config('shearerline.tables.enrollments', 'shearerline_enrollments') . '.course_id', '=', config('shearerline.tables.courses', 'shearerline_courses') . '.id')
+                ->sum(config('shearerline.tables.courses', 'shearerline_courses') . '.price'),
             'recent_courses' => Course::latest()->take(5)->get(),
             'recent_students' => Student::latest()->take(5)->get(),
             'recent_enrollments' => Enrollment::with(['course', 'student'])->latest()->take(5)->get(),
