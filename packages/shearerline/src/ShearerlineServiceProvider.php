@@ -8,6 +8,7 @@ use Shearerline\Contracts\ShearerlineInterface;
 use Shearerline\Events\CourseCompleted;
 use Shearerline\Events\StudentEnrolled;
 use Shearerline\Listeners\SendEnrollmentNotification;
+use Shearerline\Listeners\SendCourseCompletedNotification;
 
 class ShearerlineServiceProvider extends ServiceProvider
 {
@@ -77,7 +78,7 @@ class ShearerlineServiceProvider extends ServiceProvider
 
         Event::listen(
             CourseCompleted::class,
-            [SendEnrollmentNotification::class, 'handle']
+            [SendCourseCompletedNotification::class, 'handle']
         );
     }
 
