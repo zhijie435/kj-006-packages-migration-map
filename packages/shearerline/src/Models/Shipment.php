@@ -5,10 +5,13 @@ namespace Shearerline\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Shearerline\Contracts\HasStatusInterface;
+use Shearerline\Traits\HasStatus;
 
-class Shipment extends Model
+class Shipment extends Model implements HasStatusInterface
 {
     use HasFactory;
+    use HasStatus;
 
     const STATUS_PENDING = 'pending';
     const STATUS_SHIPPED = 'shipped';
@@ -16,6 +19,33 @@ class Shipment extends Model
     const STATUS_DELIVERED = 'delivered';
     const STATUS_RETURNED = 'returned';
     const STATUS_FAILED = 'failed';
+
+    protected string $statusConfigKey = 'shipment';
+
+    protected string $defaultStatus = self::STATUS_PENDING;
+
+    protected array $statusTransitions = [
+        self::STATUS_PENDING => [
+            self::STATUS_SHIPPED,
+            self::STATUS_FAILED,
+        ],
+        self::STATUS_SHIPPED => [
+            self::STATUS_IN_TRANSIT,
+            self::STATUS_DELIVERED,
+            self::STATUS_RETURNED,
+            self::STATUS_FAILED,
+        ],
+        self::STATUS_IN_TRANSIT => [
+            self::STATUS_DELIVERED,
+            self::STATUS_RETURNED,
+            self::STATUS_FAILED,
+        ],
+        self::STATUS_DELIVERED => [
+            self::STATUS_RETURNED,
+        ],
+        self::STATUS_RETURNED => [],
+        self::STATUS_FAILED => [],
+    ];
 
     protected $fillable = [
         'moq_order_id',
@@ -50,57 +80,69 @@ class Shipment extends Model
         $this->table = config('shearerline.tables.shipments', 'shearerline_shipments');
     }
 
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function ($model) {
+            if (empty($model->status)) {
+                $model->status = $model->getDefaultStatus();
+            }
+        });
+    }
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(config('shearerline.models.moq_order', MoqOrder::class), 'moq_order_id');
     }
 
-    public function getStatusTextAttribute(): string
-    {
-        $statusMap = config('shearerline.status.shipment', [
-            self::STATUS_PENDING => '待发货',
-            self::STATUS_SHIPPED => '已发货',
-            self::STATUS_IN_TRANSIT => '运输中',
-            self::STATUS_DELIVERED => '已签收',
-            self::STATUS_RETURNED => '已退回',
-            self::STATUS_FAILED => '发货失败',
-        ]);
-
-        return $statusMap[$this->status] ?? $this->status;
-    }
-
     public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_PENDING);
+        return $query->whereStatus(self::STATUS_PENDING);
     }
 
     public function scopeShipped($query)
     {
-        return $query->where('status', self::STATUS_SHIPPED);
+        return $query->whereStatus(self::STATUS_SHIPPED);
     }
 
     public function scopeInTransit($query)
     {
-        return $query->where('status', self::STATUS_IN_TRANSIT);
+        return $query->whereStatus(self::STATUS_IN_TRANSIT);
     }
 
     public function scopeDelivered($query)
     {
-        return $query->where('status', self::STATUS_DELIVERED);
+        return $query->whereStatus(self::STATUS_DELIVERED);
     }
 
     public function scopeReturned($query)
     {
-        return $query->where('status', self::STATUS_RETURNED);
+        return $query->whereStatus(self::STATUS_RETURNED);
     }
 
     public function scopeFailed($query)
     {
-        return $query->where('status', self::STATUS_FAILED);
+        return $query->whereStatus(self::STATUS_FAILED);
     }
 
     public function canUpdateTracking(): bool
     {
-        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_SHIPPED, self::STATUS_IN_TRANSIT]);
+        return $this->isStatus([
+            self::STATUS_PENDING,
+            self::STATUS_SHIPPED,
+            self::STATUS_IN_TRANSIT,
+        ]);
+    }
+
+    protected function beforeStatusTransition(string $targetStatus, array $extra = []): void
+    {
+        if ($targetStatus === self::STATUS_SHIPPED && empty($this->shipped_at)) {
+            $this->shipped_at = now();
+        }
+
+        if ($targetStatus === self::STATUS_DELIVERED && empty($this->delivered_at)) {
+            $this->delivered_at = now();
+        }
     }
 }

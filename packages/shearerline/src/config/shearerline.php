@@ -72,4 +72,9 @@ return [
         'prefix' => 'shearerline',
     ],
 
+    'auth' => [
+        'enabled' => env('SHEARERLINE_AUTH_ENABLED', false),
+        'guard' => env('SHEARERLINE_AUTH_GUARD', null),
+    ],
+
 ];

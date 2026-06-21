@@ -3,12 +3,31 @@
 namespace Shearerline;
 
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Shearerline\Contracts\ShearerlineInterface;
 use Shearerline\Events\CourseCompleted;
 use Shearerline\Events\StudentEnrolled;
 use Shearerline\Listeners\SendEnrollmentNotification;
 use Shearerline\Listeners\SendCourseCompletedNotification;
+use Shearerline\Models\Course;
+use Shearerline\Models\Enrollment;
+use Shearerline\Models\Lesson;
+use Shearerline\Models\MoqOrder;
+use Shearerline\Models\Product;
+use Shearerline\Models\Shipment;
+use Shearerline\Models\Student;
+use Shearerline\Models\Supplier;
+use Shearerline\Models\Teacher;
+use Shearerline\Policies\CoursePolicy;
+use Shearerline\Policies\EnrollmentPolicy;
+use Shearerline\Policies\LessonPolicy;
+use Shearerline\Policies\MoqOrderPolicy;
+use Shearerline\Policies\ProductPolicy;
+use Shearerline\Policies\ShipmentPolicy;
+use Shearerline\Policies\StudentPolicy;
+use Shearerline\Policies\SupplierPolicy;
+use Shearerline\Policies\TeacherPolicy;
 
 class ShearerlineServiceProvider extends ServiceProvider
 {
@@ -30,6 +49,7 @@ class ShearerlineServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerPolicies();
         $this->registerEvents();
 
         if ($this->app->runningInConsole()) {
@@ -106,6 +126,27 @@ class ShearerlineServiceProvider extends ServiceProvider
             $this->commands([
                 \Shearerline\Console\Commands\InstallCommand::class,
             ]);
+        }
+    }
+
+    protected function registerPolicies(): void
+    {
+        $policies = [
+            Course::class => CoursePolicy::class,
+            Lesson::class => LessonPolicy::class,
+            Student::class => StudentPolicy::class,
+            Teacher::class => TeacherPolicy::class,
+            Enrollment::class => EnrollmentPolicy::class,
+            Supplier::class => SupplierPolicy::class,
+            Product::class => ProductPolicy::class,
+            MoqOrder::class => MoqOrderPolicy::class,
+            Shipment::class => ShipmentPolicy::class,
+        ];
+
+        foreach ($policies as $model => $policy) {
+            if (class_exists($model) && class_exists($policy)) {
+                Gate::policy($model, $policy);
+            }
         }
     }
 }

@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Shearerline\Contracts\HasStatusInterface;
+use Shearerline\Traits\HasStatus;
 
-class MoqOrder extends Model
+class MoqOrder extends Model implements HasStatusInterface
 {
     use HasFactory;
     use SoftDeletes;
+    use HasStatus;
 
     const STATUS_PENDING = 'pending';
     const STATUS_CONFIRMED = 'confirmed';
@@ -20,6 +23,37 @@ class MoqOrder extends Model
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
     const STATUS_REFUNDED = 'refunded';
+
+    protected string $statusConfigKey = 'moq_order';
+
+    protected string $defaultStatus = self::STATUS_PENDING;
+
+    protected array $statusTransitions = [
+        self::STATUS_PENDING => [
+            self::STATUS_CONFIRMED,
+            self::STATUS_CANCELLED,
+        ],
+        self::STATUS_CONFIRMED => [
+            self::STATUS_PROCESSING,
+            self::STATUS_SHIPPED,
+            self::STATUS_CANCELLED,
+            self::STATUS_REFUNDED,
+        ],
+        self::STATUS_PROCESSING => [
+            self::STATUS_SHIPPED,
+            self::STATUS_CANCELLED,
+            self::STATUS_REFUNDED,
+        ],
+        self::STATUS_SHIPPED => [
+            self::STATUS_COMPLETED,
+            self::STATUS_REFUNDED,
+        ],
+        self::STATUS_COMPLETED => [
+            self::STATUS_REFUNDED,
+        ],
+        self::STATUS_CANCELLED => [],
+        self::STATUS_REFUNDED => [],
+    ];
 
     protected $fillable = [
         'order_no',
@@ -67,6 +101,17 @@ class MoqOrder extends Model
         $this->table = config('shearerline.tables.moq_orders', 'shearerline_moq_orders');
     }
 
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function ($model) {
+            if (empty($model->status)) {
+                $model->status = $model->getDefaultStatus();
+            }
+        });
+    }
+
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(config('shearerline.models.supplier', Supplier::class));
@@ -92,89 +137,99 @@ class MoqOrder extends Model
         return $this->shipped_quantity > 0 && $this->shipped_quantity < $this->total_quantity;
     }
 
-    public function getStatusTextAttribute(): string
-    {
-        $statusMap = config('shearerline.status.moq_order', [
-            self::STATUS_PENDING => '待确认',
-            self::STATUS_CONFIRMED => '已确认',
-            self::STATUS_PROCESSING => '处理中',
-            self::STATUS_SHIPPED => '已发货',
-            self::STATUS_COMPLETED => '已完成',
-            self::STATUS_CANCELLED => '已取消',
-            self::STATUS_REFUNDED => '已退款',
-        ]);
-
-        return $statusMap[$this->status] ?? $this->status;
-    }
-
     public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_PENDING);
+        return $query->whereStatus(self::STATUS_PENDING);
     }
 
     public function scopeConfirmed($query)
     {
-        return $query->where('status', self::STATUS_CONFIRMED);
+        return $query->whereStatus(self::STATUS_CONFIRMED);
     }
 
     public function scopeProcessing($query)
     {
-        return $query->where('status', self::STATUS_PROCESSING);
+        return $query->whereStatus(self::STATUS_PROCESSING);
     }
 
     public function scopeShipped($query)
     {
-        return $query->where('status', self::STATUS_SHIPPED);
+        return $query->whereStatus(self::STATUS_SHIPPED);
     }
 
     public function scopeCompleted($query)
     {
-        return $query->where('status', self::STATUS_COMPLETED);
+        return $query->whereStatus(self::STATUS_COMPLETED);
     }
 
     public function scopeCancelled($query)
     {
-        return $query->where('status', self::STATUS_CANCELLED);
+        return $query->whereStatus(self::STATUS_CANCELLED);
     }
 
     public function scopeRefunded($query)
     {
-        return $query->where('status', self::STATUS_REFUNDED);
+        return $query->whereStatus(self::STATUS_REFUNDED);
     }
 
     public function canConfirm(): bool
     {
-        return $this->status === self::STATUS_PENDING;
+        return $this->canTransitionTo(self::STATUS_CONFIRMED);
     }
 
     public function canProcess(): bool
     {
-        return $this->status === self::STATUS_CONFIRMED;
+        return $this->canTransitionTo(self::STATUS_PROCESSING);
     }
 
     public function canShip(): bool
     {
-        return in_array($this->status, [self::STATUS_CONFIRMED, self::STATUS_PROCESSING]);
+        return $this->canTransitionTo(self::STATUS_SHIPPED);
     }
 
     public function canCancel(): bool
     {
-        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_CONFIRMED, self::STATUS_PROCESSING]);
+        return $this->canTransitionTo(self::STATUS_CANCELLED);
     }
 
     public function canRefund(): bool
     {
-        return in_array($this->status, [self::STATUS_CONFIRMED, self::STATUS_PROCESSING, self::STATUS_SHIPPED, self::STATUS_COMPLETED]);
+        return $this->canTransitionTo(self::STATUS_REFUNDED);
     }
 
     public function canComplete(): bool
     {
-        return $this->status === self::STATUS_SHIPPED && $this->is_fully_shipped;
+        return $this->canTransitionTo(self::STATUS_COMPLETED) && $this->is_fully_shipped;
     }
 
     public function canPay(): bool
     {
         return $this->paid_amount <= 0
-            && in_array($this->status, [self::STATUS_PENDING, self::STATUS_CONFIRMED, self::STATUS_PROCESSING]);
+            && $this->isStatus([self::STATUS_PENDING, self::STATUS_CONFIRMED, self::STATUS_PROCESSING]);
+    }
+
+    public function isStatus(string|array $status): bool
+    {
+        if (is_array($status)) {
+            return in_array($this->getStatus(), $status, true);
+        }
+
+        return parent::isStatus($status);
+    }
+
+    protected function beforeStatusTransition(string $targetStatus, array $extra = []): void
+    {
+        $timestampFields = [
+            self::STATUS_CONFIRMED => 'confirmed_at',
+            self::STATUS_PROCESSING => 'processed_at',
+            self::STATUS_SHIPPED => 'shipped_at',
+            self::STATUS_COMPLETED => 'completed_at',
+            self::STATUS_CANCELLED => 'cancelled_at',
+            self::STATUS_REFUNDED => 'refunded_at',
+        ];
+
+        if (isset($timestampFields[$targetStatus]) && empty($this->{$timestampFields[$targetStatus]})) {
+            $this->{$timestampFields[$targetStatus]} = now();
+        }
     }
 }

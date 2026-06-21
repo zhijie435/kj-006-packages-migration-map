@@ -19,10 +19,12 @@ class ShipmentController extends BaseController
 
     public function index(Request $request)
     {
+        $this->checkPermission('viewAny', Shipment::class);
+
         $query = Shipment::with('order');
 
         if ($request->has('status')) {
-            $query->where('status', $request->status);
+            $query->whereStatus($request->status);
         }
 
         if ($request->has('logistics_company')) {
@@ -41,40 +43,34 @@ class ShipmentController extends BaseController
             $query->whereDate('created_at', '<=', $request->end_date);
         }
 
-        $perPage = $request->get('per_page', 15);
+        $perPage = $request->get('per_page', config('shearerline.pagination.per_page', 15));
         $shipments = $query->latest()->paginate($perPage);
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $shipments,
-        ]);
+        return $this->paginated($shipments);
     }
 
     public function byOrder(Request $request, MoqOrder $order)
     {
+        $this->checkPermission('view', $order);
+
         $shipments = $order->shipments()->latest()->get();
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $shipments,
-        ]);
+        return $this->success($shipments);
     }
 
     public function show(Shipment $shipment)
     {
+        $this->checkPermission('view', $shipment);
+
         $shipment->load('order');
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $shipment,
-        ]);
+        return $this->success($shipment);
     }
 
     public function updateTracking(Request $request, Shipment $shipment)
     {
+        $this->checkPermission('updateTracking', $shipment);
+
         $validated = $request->validate([
             'logistics_company' => 'sometimes|string|max:100',
             'tracking_no' => 'sometimes|string|max:100',
@@ -89,39 +85,21 @@ class ShipmentController extends BaseController
             'remark' => 'nullable|string|max:500',
         ]);
 
-        try {
-            $shipment = $this->moqService->updateTracking($shipment->id, $validated);
+        $shipment = $this->moqService->updateTracking($shipment->id, $validated);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '物流信息更新成功',
-                'data' => $shipment,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success($shipment, '物流信息更新成功');
     }
 
     public function destroy(Shipment $shipment)
     {
+        $this->checkPermission('delete', $shipment);
+
         if ($shipment->status !== Shipment::STATUS_PENDING) {
-            return response()->json([
-                'code' => 400,
-                'message' => '只有待发货状态的物流记录可以删除',
-                'data' => null,
-            ], 400);
+            return $this->error('只有待发货状态的物流记录可以删除', 400);
         }
 
         $shipment->delete();
 
-        return response()->json([
-            'code' => 200,
-            'message' => '物流记录删除成功',
-            'data' => null,
-        ]);
+        return $this->success(null, '物流记录删除成功');
     }
 }

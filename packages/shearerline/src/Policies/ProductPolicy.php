@@ -2,34 +2,34 @@
 
 namespace Shearerline\Policies;
 
-use Shearerline\Models\Course;
+use Shearerline\Models\Product;
 use Illuminate\Foundation\Auth\User;
 
-class CoursePolicy
+class ProductPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->hasPermission($user, 'courses.view');
+        return $this->hasPermission($user, 'products.view');
     }
 
-    public function view(User $user, Course $course): bool
+    public function view(User $user, Product $product): bool
     {
-        return $this->hasPermission($user, 'courses.view');
+        return $this->hasPermission($user, 'products.view');
     }
 
     public function create(User $user): bool
     {
-        return $this->hasPermission($user, 'courses.create');
+        return $this->hasPermission($user, 'products.create');
     }
 
-    public function update(User $user, Course $course): bool
+    public function update(User $user, Product $product): bool
     {
-        return $this->hasPermission($user, 'courses.update');
+        return $this->hasPermission($user, 'products.update');
     }
 
-    public function delete(User $user, Course $course): bool
+    public function delete(User $user, Product $product): bool
     {
-        return $this->hasPermission($user, 'courses.delete');
+        return $this->hasPermission($user, 'products.delete');
     }
 
     protected function hasPermission(User $user, string $permission): bool

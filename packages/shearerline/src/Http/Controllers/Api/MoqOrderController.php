@@ -18,6 +18,8 @@ class MoqOrderController extends BaseController
 
     public function index(Request $request)
     {
+        $this->checkPermission('viewAny', MoqOrder::class);
+
         $filters = $request->only([
             'status',
             'supplier_id',
@@ -29,15 +31,13 @@ class MoqOrderController extends BaseController
 
         $orders = $this->moqService->getOrderList($filters);
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $orders,
-        ]);
+        return $this->paginated($orders);
     }
 
     public function store(Request $request)
     {
+        $this->checkPermission('create', MoqOrder::class);
+
         $validated = $request->validate([
             'supplier_id' => 'required|exists:' . config('shearerline.tables.suppliers', 'shearerline_suppliers') . ',id',
             'customer_name' => 'required|string|max:100',
@@ -50,74 +50,42 @@ class MoqOrderController extends BaseController
             'items.*.remark' => 'nullable|string|max:500',
         ]);
 
-        try {
-            $order = $this->moqService->createOrder($validated);
+        $order = $this->moqService->createOrder($validated);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单创建成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success($order, '订单创建成功', 201);
     }
 
     public function show(MoqOrder $order)
     {
+        $this->checkPermission('view', $order);
+
         $order = $this->moqService->getOrderDetail($order->id);
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $order,
-        ]);
+        return $this->success($order);
     }
 
     public function confirm(MoqOrder $order)
     {
-        try {
-            $order = $this->moqService->confirmOrder($order->id);
+        $this->checkPermission('confirm', $order);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单确认成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        $order = $this->moqService->confirmOrder($order->id);
+
+        return $this->success($order, '订单确认成功');
     }
 
     public function process(MoqOrder $order)
     {
-        try {
-            $order = $this->moqService->processOrder($order->id);
+        $this->checkPermission('process', $order);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单开始处理',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        $order = $this->moqService->processOrder($order->id);
+
+        return $this->success($order, '订单开始处理');
     }
 
     public function ship(Request $request, MoqOrder $order)
     {
+        $this->checkPermission('ship', $order);
+
         $validated = $request->validate([
             'logistics_company' => 'required|string|max:100',
             'tracking_no' => 'required|string|max:100',
@@ -132,118 +100,68 @@ class MoqOrderController extends BaseController
             'remark' => 'nullable|string|max:500',
         ]);
 
-        try {
-            $shipment = $this->moqService->shipOrder($order->id, $validated);
-            $order = $this->moqService->getOrderDetail($order->id);
+        $shipment = $this->moqService->shipOrder($order->id, $validated);
+        $order = $this->moqService->getOrderDetail($order->id);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '发货成功',
-                'data' => [
-                    'order' => $order,
-                    'shipment' => $shipment,
-                ],
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success([
+            'order' => $order,
+            'shipment' => $shipment,
+        ], '发货成功');
     }
 
     public function complete(MoqOrder $order)
     {
-        try {
-            $order = $this->moqService->completeOrder($order->id);
+        $this->checkPermission('complete', $order);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单完成成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        $order = $this->moqService->completeOrder($order->id);
+
+        return $this->success($order, '订单完成成功');
     }
 
     public function cancel(Request $request, MoqOrder $order)
     {
+        $this->checkPermission('cancel', $order);
+
         $validated = $request->validate([
             'reason' => 'required|string|max:500',
         ]);
 
-        try {
-            $order = $this->moqService->cancelOrder($order->id, $validated['reason']);
+        $order = $this->moqService->cancelOrder($order->id, $validated['reason']);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单取消成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success($order, '订单取消成功');
     }
 
     public function refund(Request $request, MoqOrder $order)
     {
+        $this->checkPermission('refund', $order);
+
         $validated = $request->validate([
             'reason' => 'required|string|max:500',
         ]);
 
-        try {
-            $order = $this->moqService->refundOrder($order->id, $validated['reason']);
+        $order = $this->moqService->refundOrder($order->id, $validated['reason']);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单退款成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success($order, '订单退款成功');
     }
 
     public function pay(Request $request, MoqOrder $order)
     {
+        $this->checkPermission('pay', $order);
+
         $validated = $request->validate([
             'amount' => 'nullable|numeric|min:0',
             'method' => 'nullable|string|max:50',
         ]);
 
-        try {
-            $order = $this->moqService->payOrder($order->id, $validated);
+        $order = $this->moqService->payOrder($order->id, $validated);
 
-            return response()->json([
-                'code' => 200,
-                'message' => '订单支付成功',
-                'data' => $order,
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'code' => 400,
-                'message' => $e->getMessage(),
-                'data' => null,
-            ], 400);
-        }
+        return $this->success($order, '订单支付成功');
     }
 
     public function statistics(Request $request)
     {
+        $this->checkPermission('viewStatistics', MoqOrder::class);
+
         $filters = $request->only([
             'start_date',
             'end_date',
@@ -252,10 +170,6 @@ class MoqOrderController extends BaseController
 
         $statistics = $this->moqService->getStatistics($filters);
 
-        return response()->json([
-            'code' => 200,
-            'message' => 'success',
-            'data' => $statistics,
-        ]);
+        return $this->success($statistics);
     }
 }
