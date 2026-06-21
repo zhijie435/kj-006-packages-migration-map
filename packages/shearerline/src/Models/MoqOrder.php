@@ -94,7 +94,7 @@ class MoqOrder extends Model
 
     public function getStatusTextAttribute(): string
     {
-        $statusMap = [
+        $statusMap = config('shearerline.status.moq_order', [
             self::STATUS_PENDING => '待确认',
             self::STATUS_CONFIRMED => '已确认',
             self::STATUS_PROCESSING => '处理中',
@@ -102,7 +102,7 @@ class MoqOrder extends Model
             self::STATUS_COMPLETED => '已完成',
             self::STATUS_CANCELLED => '已取消',
             self::STATUS_REFUNDED => '已退款',
-        ];
+        ]);
 
         return $statusMap[$this->status] ?? $this->status;
     }
@@ -170,5 +170,11 @@ class MoqOrder extends Model
     public function canComplete(): bool
     {
         return $this->status === self::STATUS_SHIPPED && $this->is_fully_shipped;
+    }
+
+    public function canPay(): bool
+    {
+        return $this->paid_amount <= 0
+            && in_array($this->status, [self::STATUS_PENDING, self::STATUS_CONFIRMED, self::STATUS_PROCESSING]);
     }
 }

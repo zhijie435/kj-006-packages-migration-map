@@ -192,6 +192,13 @@
           开始处理
         </el-button>
         <el-button
+          v-if="(orderDetail.status === 'pending' || orderDetail.status === 'confirmed' || orderDetail.status === 'processing') && !orderDetail.paid_amount"
+          type="success"
+          @click="handlePay"
+        >
+          支付
+        </el-button>
+        <el-button
           v-if="orderDetail.status === 'confirmed' || orderDetail.status === 'processing'"
           type="warning"
           @click="handleShip"
@@ -279,11 +286,12 @@
         </el-form-item>
         <el-form-item label="物流状态">
           <el-select v-model="trackingForm.status" style="width: 100%">
+            <el-option label="待发货" value="pending" />
             <el-option label="已发货" value="shipped" />
             <el-option label="运输中" value="in_transit" />
             <el-option label="已签收" value="delivered" />
             <el-option label="已退回" value="returned" />
-            <el-option label="失败" value="failed" />
+            <el-option label="发货失败" value="failed" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -451,6 +459,38 @@ const handleShip = () => {
   shipDialogVisible.value = true
 }
 
+const handlePay = async () => {
+  try {
+    const { value: method } = await ElMessageBox.prompt(
+      '请选择支付方式',
+      '订单支付',
+      {
+        type: 'warning',
+        inputPlaceholder: '请输入支付方式（如：微信、支付宝、银行转账）',
+        inputValue: '微信',
+        inputValidator: (value) => {
+          if (!value || value.trim().length === 0) {
+            return '请输入支付方式'
+          }
+          return true
+        },
+      }
+    )
+    const res = await moqOrderApi.pay(props.orderId, { method })
+    if (res.code === 200) {
+      ElMessage.success('支付成功')
+      orderDetail.value = res.data
+      emit('order-updated')
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.message || '操作失败')
+    }
+  }
+}
+
 const validateShipItems = () => {
   const total = shipForm.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
   return total > 0
@@ -588,7 +628,11 @@ const submitTracking = async () => {
     if (res.code === 200) {
       ElMessage.success('物流信息更新成功')
       trackingDialogVisible.value = false
-      fetchOrderDetail()
+      if (res.data && res.data.order) {
+        orderDetail.value = res.data.order
+      } else {
+        fetchOrderDetail()
+      }
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')

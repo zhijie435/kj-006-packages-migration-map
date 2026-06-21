@@ -47,6 +47,26 @@ return [
         'directory' => 'shearerline',
     ],
 
+    'status' => [
+        'moq_order' => [
+            'pending' => '待确认',
+            'confirmed' => '已确认',
+            'processing' => '处理中',
+            'shipped' => '已发货',
+            'completed' => '已完成',
+            'cancelled' => '已取消',
+            'refunded' => '已退款',
+        ],
+        'shipment' => [
+            'pending' => '待发货',
+            'shipped' => '已发货',
+            'in_transit' => '运输中',
+            'delivered' => '已签收',
+            'returned' => '已退回',
+            'failed' => '发货失败',
+        ],
+    ],
+
     'views' => [
         'enabled' => true,
         'prefix' => 'shearerline',

@@ -335,8 +335,8 @@ class MoqDirectShipService
         return DB::transaction(function () use ($orderId, $paymentData) {
             $order = MoqOrder::findOrFail($orderId);
 
-            if ($order->paid_amount > 0) {
-                throw new \InvalidArgumentException('订单已支付');
+            if (!$order->canPay()) {
+                throw new \InvalidArgumentException('订单状态不允许支付或已支付');
             }
 
             $order->update([

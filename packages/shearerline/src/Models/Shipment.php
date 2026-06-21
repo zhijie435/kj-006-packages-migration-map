@@ -57,14 +57,14 @@ class Shipment extends Model
 
     public function getStatusTextAttribute(): string
     {
-        $statusMap = [
+        $statusMap = config('shearerline.status.shipment', [
             self::STATUS_PENDING => '待发货',
             self::STATUS_SHIPPED => '已发货',
             self::STATUS_IN_TRANSIT => '运输中',
-            self::STATUS_DELIVERED => '已送达',
+            self::STATUS_DELIVERED => '已签收',
             self::STATUS_RETURNED => '已退回',
             self::STATUS_FAILED => '发货失败',
-        ];
+        ]);
 
         return $statusMap[$this->status] ?? $this->status;
     }

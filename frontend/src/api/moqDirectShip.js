@@ -57,5 +57,5 @@ export const shipmentStatusMap = {
   in_transit: { text: '运输中', type: 'warning' },
   delivered: { text: '已签收', type: 'success' },
   returned: { text: '已退回', type: 'danger' },
-  failed: { text: '失败', type: 'danger' },
+  failed: { text: '发货失败', type: 'danger' },
 }

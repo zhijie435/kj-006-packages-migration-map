@@ -40,8 +40,8 @@
       <el-tag
         v-for="(item, key) in statusTabs"
         :key="key"
-        :type="statusFilter === key ? 'primary' : 'info'"
-        :effect="statusFilter === key ? 'dark' : 'plain'"
+        :type="localStatusFilter === key ? 'primary' : 'info'"
+        :effect="localStatusFilter === key ? 'dark' : 'plain'"
         class="status-tag"
         @click="handleStatusTab(key)"
       >
@@ -84,7 +84,7 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="360" fixed="right">
+      <el-table-column label="操作" width="420" fixed="right">
         <template #default="{ row }">
           <el-button type="primary" link @click="handleView(row)">查看</el-button>
           <el-button
@@ -102,6 +102,14 @@
             @click="handleProcess(row)"
           >
             开始处理
+          </el-button>
+          <el-button
+            v-if="(row.status === 'pending' || row.status === 'confirmed' || row.status === 'processing') && !row.paid_amount"
+            type="success"
+            link
+            @click="handlePay(row)"
+          >
+            支付
           </el-button>
           <el-button
             v-if="row.status === 'confirmed' || row.status === 'processing'"
@@ -309,17 +317,19 @@ const orders = ref([])
 const suppliers = ref([])
 const availableProducts = ref([])
 const createDialogVisible = ref(false)
+const localStatusFilter = ref(props.statusFilter)
+const statistics = ref({})
 
-const statusTabs = reactive({
-  '': { text: '全部' },
-  pending: { text: '待确认' },
-  confirmed: { text: '已确认' },
-  processing: { text: '处理中' },
-  shipped: { text: '已发货' },
-  completed: { text: '已完成' },
-  cancelled: { text: '已取消' },
-  refunded: { text: '已退款' },
-})
+const statusTabs = computed(() => ({
+  '': { text: '全部', count: statistics.value.total_orders },
+  pending: { text: '待确认', count: statistics.value.pending_count },
+  confirmed: { text: '已确认', count: statistics.value.confirmed_count },
+  processing: { text: '处理中', count: statistics.value.processing_count },
+  shipped: { text: '已发货', count: statistics.value.shipped_count },
+  completed: { text: '已完成', count: statistics.value.completed_count },
+  cancelled: { text: '已取消', count: statistics.value.cancelled_count },
+  refunded: { text: '已退款', count: statistics.value.refunded_count },
+}))
 
 const filters = reactive({
   keyword: '',
@@ -392,7 +402,7 @@ const loadOrders = async () => {
     const params = {
       page: pagination.page,
       per_page: pagination.pageSize,
-      status: props.statusFilter || undefined,
+      status: localStatusFilter.value || undefined,
       keyword: filters.keyword || undefined,
       supplier_id: filters.supplier_id || undefined,
     }
@@ -409,7 +419,21 @@ const loadOrders = async () => {
   }
 }
 
+const loadStatistics = async () => {
+  try {
+    const res = await moqOrderApi.statistics()
+    if (res.code === 200) {
+      statistics.value = res.data
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
 const handleStatusTab = (key) => {
+  localStatusFilter.value = localStatusFilter.value === key ? '' : key
+  pagination.page = 1
+  loadOrders()
   emit('order-updated')
 }
 
@@ -497,6 +521,7 @@ const handleConfirm = async (row) => {
     if (res.code === 200) {
       ElMessage.success('订单已确认')
       loadOrders()
+      loadStatistics()
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')
@@ -517,6 +542,7 @@ const handleProcess = async (row) => {
     if (res.code === 200) {
       ElMessage.success('订单已开始处理')
       loadOrders()
+      loadStatistics()
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')
@@ -532,6 +558,39 @@ const handleShip = (row) => {
   emit('view-detail', row.id)
 }
 
+const handlePay = async (row) => {
+  try {
+    const { value: method } = await ElMessageBox.prompt(
+      '请选择支付方式',
+      '订单支付',
+      {
+        type: 'warning',
+        inputPlaceholder: '请输入支付方式（如：微信、支付宝、银行转账）',
+        inputValue: '微信',
+        inputValidator: (value) => {
+          if (!value || value.trim().length === 0) {
+            return '请输入支付方式'
+          }
+          return true
+        },
+      }
+    )
+    const res = await moqOrderApi.pay(row.id, { method })
+    if (res.code === 200) {
+      ElMessage.success('支付成功')
+      loadOrders()
+      loadStatistics()
+      emit('order-updated')
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.message || '操作失败')
+    }
+  }
+}
+
 const handleComplete = async (row) => {
   try {
     await ElMessageBox.confirm('确认该订单已完成吗？', '完成订单', {
@@ -541,6 +600,7 @@ const handleComplete = async (row) => {
     if (res.code === 200) {
       ElMessage.success('订单已完成')
       loadOrders()
+      loadStatistics()
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')
@@ -568,6 +628,7 @@ const handleCancel = async (row) => {
     if (res.code === 200) {
       ElMessage.success('订单已取消')
       loadOrders()
+      loadStatistics()
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')
@@ -595,6 +656,7 @@ const handleRefund = async (row) => {
     if (res.code === 200) {
       ElMessage.success('退款申请已提交')
       loadOrders()
+      loadStatistics()
       emit('order-updated')
     } else {
       ElMessage.error(res.message || '操作失败')
@@ -619,19 +681,23 @@ const handlePageChange = (page) => {
 
 watch(
   () => props.statusFilter,
-  () => {
+  (val) => {
+    localStatusFilter.value = val
     pagination.page = 1
     loadOrders()
+    loadStatistics()
   }
 )
 
 onMounted(() => {
   loadSuppliers()
   loadOrders()
+  loadStatistics()
 })
 
 defineExpose({
   loadOrders,
+  loadStatistics,
 })
 </script>
 
