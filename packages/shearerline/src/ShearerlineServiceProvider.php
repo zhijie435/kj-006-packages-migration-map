@@ -36,13 +36,15 @@ class ShearerlineServiceProvider extends ServiceProvider
                 __DIR__ . '/config/shearerline.php' => config_path('shearerline.php'),
             ], 'shearerline-config');
 
-            $this->publishesMigrations([
-                __DIR__ . '/database/migrations' => database_path('migrations'),
-            ], 'shearerline-migrations');
-
-            $this->publishes([
-                __DIR__ . '/database/migrations' => database_path('migrations'),
-            ], 'shearerline-migrations');
+            if (method_exists($this, 'publishesMigrations')) {
+                $this->publishesMigrations([
+                    __DIR__ . '/database/migrations' => database_path('migrations'),
+                ], 'shearerline-migrations');
+            } else {
+                $this->publishes([
+                    __DIR__ . '/database/migrations' => database_path('migrations'),
+                ], 'shearerline-migrations');
+            }
 
             $this->publishes([
                 __DIR__ . '/database/seeds' => database_path('seeders'),
