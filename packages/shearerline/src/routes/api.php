@@ -54,7 +54,7 @@ Route::group([
     Route::get('suppliers/all', [ApiSupplierController::class, 'all'])->name('shearerline.api.suppliers.all');
     Route::apiResource('suppliers', ApiSupplierController::class, ['names' => 'shearerline.api.suppliers']);
 
-    Route::get('products/by-supplier/{supplierId}', [ApiProductController::class, 'bySupplier'])->name('shearerline.api.products.bySupplier');
+    Route::get('products/by-supplier/{supplier}', [ApiProductController::class, 'bySupplier'])->name('shearerline.api.products.bySupplier');
     Route::apiResource('products', ApiProductController::class, ['names' => 'shearerline.api.products']);
 
     Route::get('moq-orders/statistics', [ApiMoqOrderController::class, 'statistics'])->name('shearerline.api.moq-orders.statistics');
@@ -67,7 +67,7 @@ Route::group([
     Route::post('moq-orders/{order}/pay', [ApiMoqOrderController::class, 'pay'])->name('shearerline.api.moq-orders.pay');
     Route::apiResource('moq-orders', ApiMoqOrderController::class, ['names' => 'shearerline.api.moq-orders']);
 
-    Route::get('shipments/by-order/{orderId}', [ApiShipmentController::class, 'byOrder'])->name('shearerline.api.shipments.byOrder');
+    Route::get('shipments/by-order/{order}', [ApiShipmentController::class, 'byOrder'])->name('shearerline.api.shipments.byOrder');
     Route::post('shipments/{shipment}/update-tracking', [ApiShipmentController::class, 'updateTracking'])->name('shearerline.api.shipments.updateTracking');
     Route::apiResource('shipments', ApiShipmentController::class, ['names' => 'shearerline.api.shipments']);
 });
